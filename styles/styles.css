@@ -1,0 +1,35 @@
+.search {
+    display: flex;
+    flex-direction: column;
+    max-width: 800px;
+    margin: 50px auto;
+}
+
+h1 {
+    width: 400px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+input {
+    color: #432000;
+    background-color: #DCE1EB;
+    border: 0;
+    padding: 15px;
+    border-radius: 10px;
+    font-size: 25px;
+    text-align: left;
+    margin: 10px auto;
+    width: 800px;
+}
+
+#add-button {
+    color: white;
+    background-color: limegreen;
+    border: 0;
+    padding: 15px;
+    border-radius: 10px;
+    font-size: 25px;
+    text-align: center;
+    width: 800px;
+}
