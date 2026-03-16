@@ -1,63 +1,71 @@
-import { useState } from "react";
-import CardItem from "./components/CardItem";
-import SearchBar from "./components/SearchBar";
-import TextListGroup from "./components/TextListGroup";
+import { lazy, Suspense, useState, useEffect } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { Nav } from '@/components/layout/Nav'
+import { ErrorBoundary } from '@/components/layout/ErrorBoundary'
+import { Spinner } from '@/components/ui/Spinner'
+import { useCollectionStore } from '@/store/collectionStore'
 
-function App() {
-  const [cards, setCards] = useState<CardItem[]>([
-    new CardItem(1, "Teval, The Balanced Scale"),
-    new CardItem(2, "The One Ring"),
-    new CardItem(3, "Galadriel, Light of Valinor"),
-    new CardItem(4, "Wyleth, Soul of Steel"),
-    new CardItem(5, "Rhystic Study"),
-    new CardItem(6, "Solemn Simulacrum"),
-    new CardItem(7, "Lothlorien Blade"),
-    new CardItem(8, "The Grey Havens"),
-    new CardItem(9, "Terra, Magical Adept"),
-  ]);
+// Code-split each page — only loaded when navigated to
+const SearchPage     = lazy(() => import('@/pages/SearchPage').then((m) => ({ default: m.SearchPage })))
+const CollectionPage = lazy(() => import('@/pages/CollectionPage').then((m) => ({ default: m.CollectionPage })))
 
-  function addItem(newCard: string) {
-    const newId = Date.now();
-    const cardItem = new CardItem(newId, newCard);
-    setCards([...cards, cardItem]);
-    console.log(cards);
-  }
+// QueryClient config: sensible cache + retry behaviour
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60_000,   // 5 min before background refetch
+      gcTime: 30 * 60_000,     // 30 min before cache eviction
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
 
-  function deleteItem(id: number) {
-    setCards(cards.filter((card) => card.id !== id));
-  }
+type Page = 'search' | 'collection'
 
-  function editItem(id: number) {
-    const newTitle = prompt("Enter new card name:");
-
-    if (!newTitle) return;
-
-    setCards(
-      cards.map((card) =>
-        card.id === id
-          ? new CardItem(card.id, newTitle, card.text, card.scryfallId)
-          : card,
-      ),
-    );
-  }
-
-  const handleSelectCard = (card: CardItem) => {
-    console.log("Selected card:", card.title);
-  };
-
+function PageFallback() {
   return (
-    <>
-      <div className="container mt-4">
-        <h1>Your Card Collection</h1>
-      </div>
-      <div className="container mt-4">
-        <SearchBar onAdd={addItem} />
-      </div>
-      <div className="container mt-4">
-        <TextListGroup cards={cards} onSelectCard={handleSelectCard} onDeleteCard={deleteItem}onEditCard={editItem}/>
-      </div>
-    </>
-  );
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem', color: '#6b7280' }}>
+      <Spinner size={28} />
+    </div>
+  )
 }
 
-export default App;
+function AppShell() {
+  const [page, setPage] = useState<Page>('search')
+  const hydrate = useCollectionStore((s) => s.hydrate)
+
+  // Load collection from storage once on mount
+  useEffect(() => { void hydrate() }, [hydrate])
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#0a0f1e', color: '#e5e7eb', fontFamily: "'Crimson Pro', Georgia, serif" }}>
+      <Nav page={page} onNavigate={setPage} />
+
+      <main>
+        <ErrorBoundary>
+          <Suspense fallback={<PageFallback />}>
+            {page === 'search'     && <SearchPage />}
+            {page === 'collection' && <CollectionPage />}
+          </Suspense>
+        </ErrorBoundary>
+      </main>
+
+      <footer style={{ textAlign: 'center', padding: '2rem', color: '#374151', fontSize: 12 }}>
+        Card data via{' '}
+        <a href="https://scryfall.com" target="_blank" rel="noreferrer" style={{ color: '#4b5563', textDecoration: 'none' }}>
+          Scryfall
+        </a>
+        {' '}· Stored locally in your browser
+      </footer>
+    </div>
+  )
+}
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppShell />
+    </QueryClientProvider>
+  )
+}

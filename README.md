@@ -1,75 +1,72 @@
-# React + TypeScript + Vite
+# MTG Collection
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript collection tracker powered by the Scryfall API.
+Shoutout Claude for building the 1.0 version, everything forward was built by me
 
-Currently, two official plugins are available:
+## Quick start
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
-
-Note: This will impact Vite dev & build performances.
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Stack
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Layer | Choice | Why |
+|---|---|---|
+| UI | React 18 + TypeScript | Strict types throughout |
+| Data fetching | TanStack Query v5 | Caching, deduplication, background refresh |
+| State | Zustand | Minimal boilerplate, easy to test |
+| Build | Vite | Fast dev server, code splitting |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Project structure
+
 ```
+src/
+├── types/
+│   └── index.ts          ← Single source of truth for all types
+├── services/
+│   ├── scryfall.ts       ← Permanent: Scryfall API (stays forever)
+│   └── collection.ts     ← Swap me: localStorage now, real API later
+├── store/
+│   └── collectionStore.ts ← Zustand store (wraps collection service)
+├── hooks/
+│   ├── queryKeys.ts      ← Centralised TanStack Query key registry
+│   ├── useCardSearch.ts  ← Scryfall search + autocomplete
+│   └── useFilteredCollection.ts ← Memoised filter/sort
+├── components/
+│   ├── ui/               ← Spinner, Badge — no domain knowledge
+│   ├── card/             ← CardTile, CardImage, CardDetail, ManaCost, SearchBar
+│   └── layout/           ← Nav, ErrorBoundary
+└── pages/
+    ├── SearchPage.tsx
+    └── CollectionPage.tsx
+```
+
+## Migrating to a real backend
+
+Only `src/services/collection.ts` needs to change. Each function is already
+async and has a comment showing what its `fetch()` equivalent looks like:
+
+```ts
+// Before (localStorage):
+export async function getAll() {
+  return JSON.parse(localStorage.getItem('mtg:collection') ?? '[]')
+}
+
+// After (real API):
+export async function getAll() {
+  return fetch('/api/collection').then(r => r.json())
+}
+```
+
+The store, hooks, and components are untouched.
+
+## Performance notes
+
+- `CardTile` and `CardImage` are wrapped in `React.memo` — safe to render in large grids
+- All handlers passed to memoized children are `useCallback`-stable
+- `useFilteredCollection` uses `useMemo` — sort only re-runs when entries or filters change
+- Pages are `React.lazy` — each is a separate chunk, loaded on first navigation
+- TanStack Query deduplicates concurrent requests and caches results across the session
+- `searchCards` has a `maxPages` cap (default 3) to avoid unbounded fetches
